@@ -9,13 +9,13 @@ runs:
       id: python-version
       shell: bash
       run: |
-        echo "version=$(python -c 'import sys; print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')" >> "$GITHUB_OUTPUT"
+        echo "version=$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" >> "$GITHUB_OUTPUT"
 
     - name: Cache pip
       uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ steps.python-version.outputs.version }}-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}-v2
+        key: ${{ runner.os }}-pip-${{ steps.python-version.outputs.version }}-${{ hashFiles('requirements.txt') }}-v2
         restore-keys: |
           ${{ runner.os }}-pip-${{ steps.python-version.outputs.version }}-
 

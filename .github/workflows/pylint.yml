@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   lint:
-    runs-on: ${{ vars.RUNS_ON }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 

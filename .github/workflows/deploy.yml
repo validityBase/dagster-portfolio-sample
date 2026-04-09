@@ -19,7 +19,7 @@ env:
 jobs:
   dagster_cloud_default_deploy:
     name: Dagster Serverless Deploy
-    runs-on: ${{ vars.RUNS_ON }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     outputs:
       build_info: ${{ steps.parse-workspace.outputs.build_info }}
 
@@ -39,7 +39,7 @@ jobs:
         if: steps.prerun.outputs.result == 'pex-deploy'
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.head_ref || github.ref_name }}
           path: project-repo
 
       - name: Python Executable Deploy
@@ -54,7 +54,7 @@ jobs:
 
   dagster_cloud_docker_deploy:
     name: Docker Deploy
-    runs-on: ${{ vars.RUNS_ON }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     if: needs.dagster_cloud_default_deploy.outputs.build_info
     needs: dagster_cloud_default_deploy
     strategy:
@@ -65,7 +65,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.head_ref || github.ref_name }}
       - name: Build and deploy to Dagster Cloud serverless
         uses: dagster-io/dagster-cloud-action/actions/serverless_prod_deploy@d171ed1a18af759478b2613279bf6bdf2a6587e4
         with:
