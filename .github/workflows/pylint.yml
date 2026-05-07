@@ -8,22 +8,13 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   lint:
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
-    steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
-
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        uses: ./.github/actions/setup-python-deps
-
-      - name: Run Pylint
-        run: |
-          pylint --fail-under=8.0 $(git ls-files '*.py')
+    uses: validityBase/vbase-github-actions/.github/workflows/python-lint.yml@v1
+    with:
+      runner: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+      python-version: "3.11"
+      requirements-files: |
+        requirements.txt
+      pylint-command: pylint --fail-under=8.0 $(git ls-files '*.py')
