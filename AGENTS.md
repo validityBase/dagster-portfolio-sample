@@ -5,7 +5,7 @@
 - Persistent agent memory: [internal/agents/memory/](internal/agents/memory/)
 
 ## Workflow
-When making pipeline, deploy, lint, or CI changes in this repo:
+When making pipeline, deployment, lint, or CI changes in this repo:
 1. Confirm the intended behavior before editing.
 2. Keep changes scoped to the relevant workflow, module, docs, or config.
 3. Update specs or operational docs when CI behavior changes.
