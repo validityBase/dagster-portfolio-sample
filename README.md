@@ -21,6 +21,12 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+For local development and linting, install the development lock:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
 4. Set up environment variables:
 Create a `.env` file in the project root with the following variables:
 ```bash
@@ -64,6 +70,8 @@ The portfolio producer is designed to be:
 - The project uses Pylint for code quality checks (minimum score: 8.0)
 - GitHub Actions automatically runs Pylint on all pushes and pull requests
 - Pre-commit hooks are configured to run code quality checks before commits
+- Python dependencies use human-edited inputs in `requirements/src/` and
+  generated hash-locked install files in `requirements/lock/`
 
 ## Background
 

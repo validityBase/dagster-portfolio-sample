@@ -14,7 +14,7 @@ jobs:
     uses: validityBase/vbase-github-actions/.github/workflows/python-lint.yml@v1
     with:
       runner: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
-      python-version: "3.11"
+      python-version: "3.12"
       requirements-files: |
-        requirements.txt
+        requirements/lock/dev.txt
       pylint-command: pylint --fail-under=8.0 $(git ls-files '*.py')

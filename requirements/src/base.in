@@ -1,0 +1,8 @@
+boto3==1.37.30
+dagster==1.10.6
+dagster-cloud==1.10.6
+pandas==2.2.3
+pandas_market_calendars==4.6.1
+python-dotenv==1.0.0
+vbase==1.0.0
+yfinance==0.2.55
