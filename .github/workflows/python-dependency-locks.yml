@@ -3,7 +3,7 @@ name: Python Dependency Locks
 on:
   pull_request:
   push:
-    branches: ["*"]
+    branches: ["**"]
   workflow_dispatch:
 
 permissions:

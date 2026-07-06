@@ -16,7 +16,7 @@
 - Uses the runner from `vars.RUNS_ON` when set, otherwise `ubuntu-latest`.
 
 ### `.github/workflows/python-dependency-locks.yml`
-- Runs on pushes, pull requests, and manual dispatch.
+- Runs on pushes to all branch names, pull requests, and manual dispatch.
 - Installs `requirements/lock/tools.txt` with Python 3.12.
 - Regenerates `requirements/lock/tools.txt`, `requirements/lock/base.txt`, and
   `requirements/lock/dev.txt`; the workflow fails if the committed lock files
