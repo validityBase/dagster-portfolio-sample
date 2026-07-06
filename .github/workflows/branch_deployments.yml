@@ -45,6 +45,10 @@ jobs:
           ref: ${{ github.head_ref }}
           path: project-repo
 
+      - name: Prepare Python Executable requirements
+        if: steps.prerun.outputs.result == 'pex-deploy'
+        run: cp project-repo/requirements/lock/base.txt project-repo/requirements.txt
+
       - name: Python Executable Deploy
         if: steps.prerun.outputs.result == 'pex-deploy'
         uses: dagster-io/dagster-cloud-action/actions/build_deploy_python_executable@d171ed1a18af759478b2613279bf6bdf2a6587e4

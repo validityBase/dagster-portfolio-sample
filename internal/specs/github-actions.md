@@ -27,6 +27,9 @@
 - Runs on pushes to `main` and `master`.
 - Deploys to Dagster Cloud serverless production.
 - Builds with Python 3.12.
+- Copies `requirements/lock/base.txt` over `project-repo/requirements.txt`
+  before Python Executable deploys so the Dagster PEX builder receives a flat
+  hash-locked requirements file.
 - Uses pinned `dagster-io/dagster-cloud-action` actions.
 - Uses `DAGSTER_CLOUD_API_TOKEN` and `ORGANIZATION_ID` from GitHub Secrets.
 - Checks out `${{ github.head_ref || github.ref_name }}` for deploy paths that need repository files.
@@ -37,5 +40,8 @@
 - Builds with Python 3.12.
 - Grants `contents: read`, `issues: write`, and `pull-requests: write` so the
   Dagster Cloud action can check out code and update pull request comments.
+- Copies `requirements/lock/base.txt` over `project-repo/requirements.txt`
+  before Python Executable deploys so the Dagster PEX builder receives a flat
+  hash-locked requirements file.
 - Uses pinned `dagster-io/dagster-cloud-action` actions.
 - Uses `DAGSTER_CLOUD_API_TOKEN` and `ORGANIZATION_ID` from GitHub Secrets.

@@ -7,5 +7,9 @@
 - Pylint installs `requirements/lock/dev.txt` with Python 3.12 and runs `pylint --fail-under=8.0 $(git ls-files '*.py')`.
 - Runtime and development dependency inputs live in `requirements/src/`; generated hash-locked install files live in `requirements/lock/`.
 - Root `requirements.txt` and `requirements-dev.txt` are compatibility shims for the generated runtime and development locks.
+- Dagster Python Executable deploy steps copy `requirements/lock/base.txt` over
+  the checked-out root `requirements.txt` before invoking the PEX builder because
+  the builder copies requirements to `/output` and cannot resolve nested `-r`
+  paths from the root shim.
 - The old local `.github/actions/setup-python-deps` action was removed after pylint moved to the shared reusable workflow.
 - Dagster Cloud deploy workflows use pinned `dagster-io/dagster-cloud-action` actions and require `DAGSTER_CLOUD_API_TOKEN` plus `ORGANIZATION_ID`.
