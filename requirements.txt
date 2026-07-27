@@ -1,1 +1,1 @@
--r requirements/lock/base.txt
+-r requirements/base.txt

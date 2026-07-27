@@ -47,7 +47,7 @@ jobs:
 
       - name: Prepare Python Executable requirements
         if: steps.prerun.outputs.result == 'pex-deploy'
-        run: cp project-repo/requirements/lock/base.txt project-repo/requirements.txt
+        run: cp project-repo/requirements/base.txt project-repo/requirements.txt
 
       - name: Python Executable Deploy
         if: steps.prerun.outputs.result == 'pex-deploy'

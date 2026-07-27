@@ -16,5 +16,5 @@ jobs:
       runner: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
       python-version: "3.12"
       requirements-files: |
-        requirements/lock/dev.txt
+        requirements/dev.txt
       pylint-command: pylint --fail-under=8.0 $(git ls-files '*.py')
