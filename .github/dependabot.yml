@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    # Dependabot scans pip requirements in this directory.
+    directory: "/requirements"
+    schedule:
+      interval: "daily"
+      time: "00:00"
+      timezone: "Etc/UTC"
+    versioning-strategy: "increase-if-necessary"
+    groups:
+      pip-version-updates:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
+      pip-security-updates:
+        applies-to: "security-updates"
+        patterns:
+          - "*"

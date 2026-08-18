@@ -1,0 +1,7 @@
+-r base.in
+
+black==26.5.1
+dagster-webserver==1.10.6
+pre-commit>=3.8.0
+PyYAML>=6.0.2
+pylint>=3.2.7,<3.3
