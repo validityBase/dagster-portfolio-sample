@@ -13,7 +13,7 @@ env:
   DAGSTER_CLOUD_URL: "http://vbase.dagster.cloud"
   DAGSTER_CLOUD_API_TOKEN: ${{ secrets.DAGSTER_CLOUD_API_TOKEN }}
   ENABLE_FAST_DEPLOYS: 'true'
-  PYTHON_VERSION: '3.10'
+  PYTHON_VERSION: '3.12'
   DAGSTER_CLOUD_FILE: 'dagster_cloud.yaml'
 
 jobs:
@@ -41,6 +41,10 @@ jobs:
         with:
           ref: ${{ github.head_ref || github.ref_name }}
           path: project-repo
+
+      - name: Prepare Python Executable requirements
+        if: steps.prerun.outputs.result == 'pex-deploy'
+        run: cp project-repo/requirements/base.txt project-repo/requirements.txt
 
       - name: Python Executable Deploy
         if: steps.prerun.outputs.result == 'pex-deploy'

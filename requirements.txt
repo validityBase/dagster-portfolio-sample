@@ -1,8 +1,1 @@
-boto3==1.37.30
-dagster==1.10.6
-dagster-cloud==1.10.6
-pandas==2.2.3
-pandas_market_calendars==4.6.1
-pylint==3.2.7
-yfinance==0.2.55
-git+https://github.com/validityBase/vbase-py.git@main#egg=vbase
+-r requirements/base.txt

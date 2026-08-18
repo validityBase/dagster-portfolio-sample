@@ -18,7 +18,13 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 3. Install dependencies:
 ```bash
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.txt
+```
+
+For local development and linting, install the development lock:
+
+```bash
+pip install --require-hashes -r requirements-dev.txt
 ```
 
 4. Set up environment variables:
@@ -64,6 +70,8 @@ The portfolio producer is designed to be:
 - The project uses Pylint for code quality checks (minimum score: 8.0)
 - GitHub Actions automatically runs Pylint on all pushes and pull requests
 - Pre-commit hooks are configured to run code quality checks before commits
+- See `internal/specs/python-dependency-hashes.md` in this repository for the
+  dependency layout, lock policy, and regeneration commands.
 
 ## Background
 
