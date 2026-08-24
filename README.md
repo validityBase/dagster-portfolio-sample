@@ -70,19 +70,20 @@ For each Dagster partition, the asset:
 1. Produces a simple SPY position from market data.
 2. Serializes the portfolio to stable UTF-8 CSV bytes.
 3. Calculates the bytes' SHA3-256 content ID.
-4. Creates or reuses the `TestPortfolio` vBase collection.
-5. Stamps the content ID without uploading the portfolio data to vBase.
-6. Verifies the exact vBase transaction returned by the stamp request.
-7. Writes the same bytes to the configured S3 location, using the partition date
-   and verified CID in the filename to prevent portfolio records from
-   overwriting each other.
-8. Adds the S3 URI, collection CID, object CID, transaction, and timestamp to
+4. Builds a stable S3 filename from the partition date and content ID.
+5. Writes the same bytes to the configured S3 location.
+6. Creates or reuses the `TestPortfolio` vBase collection.
+7. Stamps the content ID without uploading the portfolio data to vBase.
+8. Verifies the exact vBase transaction returned by the stamp request.
+9. Adds the S3 URI, collection CID, object CID, transaction, and timestamp to
    the Dagster materialization metadata.
 
 Each materialization requests a new vBase stamp, matching the original sample's
 behavior. The vBase API also supports optional idempotent stamp requests;
 applications can enable them with a window appropriate to their own retry and
-partition semantics.
+partition semantics. If an S3 write fails, the materialization stops before
+stamping. A retry of the same partition and bytes overwrites the same S3 object
+before requesting its new stamp.
 
 ## Architecture
 

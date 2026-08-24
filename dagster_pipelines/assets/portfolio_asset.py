@@ -107,22 +107,17 @@ def _stamp_portfolio(api_key: str, object_cid: str):
 
 def _get_portfolio_filename(
     partition_date: str,
-    stamp_timestamp: str,
     object_cid: str,
 ) -> str:
-    """Build a stable, collision-resistant filename for one partition."""
-    normalized_timestamp = stamp_timestamp.strip()
-    if normalized_timestamp.endswith("Z"):
-        normalized_timestamp = normalized_timestamp[:-1] + "+00:00"
-    stamp_datetime = datetime.fromisoformat(normalized_timestamp)
-    if stamp_datetime.tzinfo is None:
-        raise ValueError("The vBase stamp timestamp must include a timezone.")
-    utc_stamp_datetime = stamp_datetime.astimezone(timezone.utc)
-    # vBase portfolio tooling parses this canonical timestamp at the basename end.
+    """Build a stable, collision-resistant filename for one daily partition."""
+    partition_datetime = datetime.strptime(partition_date, "%Y-%m-%d").replace(
+        tzinfo=timezone.utc
+    )
+    # vBase portfolio tooling parses this canonical daily timestamp at the basename end.
     return (
         f"portfolio--partition-{partition_date}"
         f"--cid-{object_cid.lower()}"
-        f"_{utc_stamp_datetime.strftime('%Y-%m-%d_%H-%M-%S%z')}.csv"
+        f"_{partition_datetime.strftime('%Y-%m-%d_%H-%M-%S%z')}.csv"
     )
 
 
@@ -148,13 +143,10 @@ def portfolio_asset(context):
     ).encode("utf-8")
     object_cid = "0x" + hashlib.sha3_256(portfolio_bytes).hexdigest()
 
-    collection, verified_receipt = _stamp_portfolio(api_key, object_cid)
-
     # A repeated partition and CID can overwrite only the same exact object bytes.
     filename = _get_portfolio_filename(
         partition_date,
-        verified_receipt.timestamp,
-        verified_receipt.object_cid,
+        object_cid,
     )
     object_key = f"{folder}/{filename}"
     s3_client = boto3.client("s3")
@@ -164,6 +156,8 @@ def portfolio_asset(context):
         Key=object_key,
         Body=portfolio_bytes,
     )
+
+    collection, verified_receipt = _stamp_portfolio(api_key, object_cid)
 
     context.add_output_metadata(
         {

@@ -62,6 +62,15 @@ class FakeS3Client:  # pylint: disable=too-few-public-methods
         self.put_calls.append(kwargs)
 
 
+class FailingS3Client:  # pylint: disable=too-few-public-methods
+    """Fail every S3 write to exercise materialization recovery ordering."""
+
+    def put_object(self, **kwargs):
+        """Raise before a portfolio can be persisted."""
+        del kwargs
+        raise RuntimeError("S3 write failed")
+
+
 class FakeVBaseAPIClient:
     """Capture vBase API calls and return one verified stamp."""
 
@@ -217,7 +226,7 @@ class PortfolioAssetTests(unittest.TestCase):
         self.assertEqual(
             s3_client.put_calls[0]["Key"],
             "test-prefix/portfolio--partition-2026-08-21"
-            f"--cid-{PORTFOLIO_CID}_2026-08-24_12-00-00+0000.csv",
+            f"--cid-{PORTFOLIO_CID}_2026-08-21_00-00-00+0000.csv",
         )
         self.assertEqual(s3_client.put_calls[0]["Body"], PORTFOLIO_BYTES)
         self.assertEqual(context.metadata["vBase object CID"], PORTFOLIO_CID)
@@ -225,6 +234,23 @@ class PortfolioAssetTests(unittest.TestCase):
             context.metadata["vBase transaction"],
             "0xtransaction",
         )
+
+    def test_s3_failure_does_not_create_a_vbase_stamp(self):
+        """Do not stamp a portfolio that was not persisted successfully."""
+        portfolio_asset_module = _load_portfolio_asset_module(FailingS3Client())
+        environment = {
+            "VBASE_API_KEY": "test-api-key",
+            "S3_BUCKET": "test-bucket",
+            "S3_FOLDER": "test-prefix",
+        }
+
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            self.assertRaisesRegex(RuntimeError, "S3 write failed"),
+        ):
+            portfolio_asset_module.portfolio_asset(FakeContext())
+
+        self.assertEqual(FakeVBaseAPIClient.instances, [])
 
     def test_first_materialization_creates_the_sample_collection(self):
         """Create and pin the collection when the account has none."""
