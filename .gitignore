@@ -1,5 +1,6 @@
 # Config
 .env*
+!.env.example
 
 # Py ignored files
 __pycache__/

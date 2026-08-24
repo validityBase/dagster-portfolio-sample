@@ -8,6 +8,11 @@
 
 ## Workflows
 
+### `.github/workflows/tests.yml`
+- Runs on pushes and pull requests for all branches.
+- Installs `requirements/dev.txt` with Python 3.12.
+- Runs the unit test suite with `python -m unittest discover -s tests -v`.
+
 ### `.github/workflows/pylint.yml`
 - Runs on pushes and pull requests for all branches.
 - Delegates to `validityBase/vbase-github-actions/.github/workflows/python-lint.yml@v1`.

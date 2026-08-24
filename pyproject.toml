@@ -1,9 +1,9 @@
 [project]
 name = "dagster-portfolio-sample"
 version = "0.1.0"
-description = "Sample Dagster and vBase pipeline for a simple portfoio"
+description = "Sample Dagster and vBase pipeline for a simple portfolio"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { text = "Apache 2.0" }
 authors = [
     { name = "ValidityBase", email = "info@validitybase.com" }
@@ -12,6 +12,9 @@ authors = [
 [tool.isort]
 # Avoid conflicts with black formatter.
 profile = "black"
+
+[tool.black]
+target-version = ["py312"]
 
 [tool.dagster]
 module_name = "dagster_pipelines.definitions"

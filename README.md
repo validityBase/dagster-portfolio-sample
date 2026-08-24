@@ -1,91 +1,120 @@
 # Dagster Portfolio Sample
 
-A sample project demonstrating how to build and validate a simple portfolio using Dagster and vBase. This project creates a daily portfolio that takes a long position in SPY if the price return is positive and a short position if negative.
+A public sample that uses Dagster to produce a daily SPY portfolio, stamp its
+exact CSV bytes with the vBase API, and store those bytes in Amazon S3.
 
-## Quickstart Guide
+## Prerequisites
 
-1. Clone the repository:
-```bash
-git clone https://github.com/validityBase/dagster-portfolio-sample.git
-cd dagster-portfolio-sample
-```
+- Python 3.12 or later on macOS or Linux (Windows users should use WSL 2)
+- A vBase account and API key from
+  [Account Settings](https://app.vbase.com/profile/#account_settings)
+- An Amazon S3 bucket where your AWS identity can write portfolio objects
 
-2. Create and activate a virtual environment (recommended):
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+The sample uses boto3's standard credential resolution. Local AWS profiles,
+AWS IAM Identity Center, environment credentials, and IAM roles are supported;
+static AWS keys are not required by the application.
 
-3. Install dependencies:
-```bash
-pip install --require-hashes -r requirements.txt
-```
+## Quickstart
 
-For local development and linting, install the development lock:
+1. Clone the repository and create an isolated environment:
 
-```bash
-pip install --require-hashes -r requirements-dev.txt
-```
+   ```bash
+   git clone https://github.com/validityBase/dagster-portfolio-sample.git
+   cd dagster-portfolio-sample
+   python -m venv venv
+   source venv/bin/activate
+   ```
 
-4. Set up environment variables:
-Create a `.env` file in the project root with the following variables:
-```bash
-# vBase Configuration
-VBASE_API_KEY=your_api_key_here           # API key for vBase authentication
-VBASE_API_URL=your_api_url_here           # vBase API endpoint URL
-VBASE_COMMITMENT_SERVICE_PRIVATE_KEY=your_private_key_here  # Private key for vBase commitment service
+   On Windows, run these Linux commands inside WSL 2.
 
-# AWS Configuration
-AWS_ACCESS_KEY_ID=your_aws_access_key     # AWS access key for S3 operations
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key # AWS secret key for S3 operations
-S3_BUCKET=your_bucket_name                # S3 bucket name for storing portfolio data
-S3_FOLDER=your_folder_name                # S3 folder path within the bucket
-```
+2. Install the reproducible dependencies for local development:
 
-For Dagster Cloud deployment, these variables should be set as secrets in your Dagster Cloud organization settings.
+   ```bash
+   python -m pip install --require-hashes -r requirements-dev.txt
+   ```
 
-5. Run the Dagster development server:
-```bash
-dagster dev
-```
+3. Copy the example configuration and replace its placeholders:
 
-6. Access the Dagster UI at `http://localhost:3000`
+   ```bash
+   cp .env.example .env
+   ```
+
+   ```dotenv
+   VBASE_API_KEY=your_vbase_api_key
+   S3_BUCKET=your_bucket_name
+   S3_FOLDER=your_portfolio_prefix
+   ```
+
+   `.env` is ignored by Git. For Dagster Cloud, configure the same values as
+   deployment environment variables or secrets. Configure AWS credentials
+   through your normal boto3 credential source.
+
+4. Start Dagster:
+
+   ```bash
+   dagster dev
+   ```
+
+5. Open `http://localhost:3000`, select the `portfolio_asset`, choose a trading-day
+   partition, and materialize it.
+
+The selected date must be an NYSE trading day. A current-day partition can only
+be materialized after the sample's target market time. Because yfinance limits
+15-minute history to the most recent 60 days, select a trading-day partition
+within that range.
+
+## What the Asset Does
+
+For each Dagster partition, the asset:
+
+1. Produces a simple SPY position from market data.
+2. Serializes the portfolio to stable UTF-8 CSV bytes.
+3. Calculates the bytes' SHA3-256 content ID.
+4. Creates or reuses the `TestPortfolio` vBase collection.
+5. Stamps the content ID without uploading the portfolio data to vBase.
+6. Verifies the exact vBase transaction returned by the stamp request.
+7. Writes the same bytes to the configured S3 location, using the partition date
+   and verified CID in the filename to prevent portfolio records from
+   overwriting each other.
+8. Adds the S3 URI, collection CID, object CID, transaction, and timestamp to
+   the Dagster materialization metadata.
+
+Each materialization requests a new vBase stamp, matching the original sample's
+behavior. The vBase API also supports optional idempotent stamp requests;
+applications can enable them with a window appropriate to their own retry and
+partition semantics.
 
 ## Architecture
 
-The project consists of several key components:
-
-1. **[Portfolio Producer](dagster_pipelines/assets/portfolio_producer.py)**: Core logic for generating portfolio positions based on SPY price movements. This is the file that will be changed to define new portfolios and datasets.
-2. **[Portfolio Asset](dagster_pipelines/assets/portfolio_asset.py)**: Dagster and vBase logic for managing the produced portfolio.
-
-### Portfolio Producer
-
-The portfolio producer is designed to be:
-- **Reusable**: Can be called from different contexts (Dagster, standalone scripts, etc.)
-- **Testable**: Has clear inputs and outputs
-- **Loggable**: Includes comprehensive logging for debugging and monitoring
+- [Portfolio producer](dagster_pipelines/assets/portfolio_producer.py) contains
+  the reusable SPY strategy logic.
+- [Portfolio asset](dagster_pipelines/assets/portfolio_asset.py) connects the
+  producer to Dagster, vBase, and S3.
+- [Portfolio schedule](dagster_pipelines/schedules/portfolio_schedule.py)
+  materializes the asset on weekdays at 3:50 PM America/New_York time.
 
 ## Development
 
-- The project uses Pylint for code quality checks (minimum score: 8.0)
-- GitHub Actions automatically runs Pylint on all pushes and pull requests
-- Pre-commit hooks are configured to run code quality checks before commits
-- See `internal/specs/python-dependency-hashes.md` in this repository for the
-  dependency layout, lock policy, and regeneration commands.
+Install the development lock and run the local checks:
 
-## Background
+```bash
+python -m pip install --require-hashes -r requirements-dev.txt
+python -m unittest discover -s tests -v
+pre-commit run --all-files
+pylint --fail-under=8.0 $(git ls-files '*.py')
+```
 
-The following resources and examples can help you onboard to vBase, understand its architecture,
-and get ready for building more complex infrastructure like this Dagster portfolio asset:
+See [Python dependency hashes](internal/specs/python-dependency-hashes.md) for
+the lock-file regeneration process.
 
-- **Onboard to vBase**: Create vBase accounts via our onboarding process. You would typically want two accounts -- one for testing and one for production. You can sign up for both accounts using https://app.vbase.com/accounts/signup/ and create `myusername-dev` and `myusername-prd` to make dev (sandbox) and eventually production stamps (commitments).
+Additional references:
 
-- **Review Basic Samples**: Study our samples in https://github.com/validityBase/vbase-py-samples/tree/main/samples, such as https://github.com/validityBase/vbase-py-samples/blob/main/samples/add_string_dataset_record.py and https://github.com/validityBase/vbase-py-samples/blob/main/samples/add_string_dataset_record_idempotent.py for stamping and verifying simple strings. These strings will be CSVs in the case of a portfolio asset. You should be able to run these with your `-dev` account for testing.
-
-- **Explore Complex Examples**: Review and understand more complex examples like https://github.com/validityBase/vbase-py-samples/blob/main/samples/produce_portfolio_history_csv_s3.py and https://github.com/validityBase/vbase-py-samples/blob/main/samples/verify_portfolio_history_csv_s3.py. You can run and modify these to write and validate local files instead of S3 objects.
-
-- **Learn Dagster**: Study Dagster (https://dagster.io/). An investment strategy can be implemented as a Dagster pipeline with a single asset that is produced (materialized) daily to read financial data, save the portfolio data, and stamp it. This pipeline is a more complex version of this sample: https://docs.dagster.io/getting-started/quickstart. For development, you can work through various Dagster demos using `dagster dev` as described here: https://docs.dagster.io/guides/deploy/deployment-options/running-dagster-locally.
+- [vBase Python samples](https://github.com/validityBase/vbase-py-samples/tree/main/samples)
+- [CSV portfolio producer](https://github.com/validityBase/vbase-py-samples/blob/main/samples/produce_portfolio_history_csv_s3.py)
+- [CSV portfolio verifier](https://github.com/validityBase/vbase-py-samples/blob/main/samples/verify_portfolio_history_csv_s3.py)
+- [Dagster 1.10 webserver and UI](https://release-1-10-21.archive.dagster-docs.io/guides/operate/webserver)
 
 ## License
 
-This project is licensed under the Apache 2.0 License - see the [LICENSE.txt](LICENSE.txt) file for details.
+This project is licensed under the Apache 2.0 License. See
+[LICENSE.txt](LICENSE.txt).
