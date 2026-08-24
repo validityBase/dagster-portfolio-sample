@@ -37,6 +37,8 @@
 ### `.github/workflows/branch_deployments.yml`
 - Runs for pull request open, synchronize, reopen, and close events.
 - Deploys or tears down Dagster Cloud branch deployments.
+- Skips deployment jobs for Dependabot pull requests because workflows
+  initiated by Dependabot cannot access the required GitHub Actions secrets.
 - Builds with Python 3.12.
 - Grants `contents: read`, `issues: write`, and `pull-requests: write` so the
   Dagster Cloud action can check out code and update pull request comments.

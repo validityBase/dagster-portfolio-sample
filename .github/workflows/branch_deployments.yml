@@ -22,6 +22,7 @@ env:
 jobs:
   dagster_cloud_default_deploy:
     name: Dagster Serverless Deploy
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     outputs:
       build_info: ${{ steps.parse-workspace.outputs.build_info }}
@@ -62,7 +63,7 @@ jobs:
   dagster_cloud_docker_deploy:
     name: Docker Deploy
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
-    if: needs.dagster_cloud_default_deploy.outputs.build_info
+    if: github.event.pull_request.user.login != 'dependabot[bot]' && needs.dagster_cloud_default_deploy.outputs.build_info
     needs: dagster_cloud_default_deploy
     strategy:
       fail-fast: false
