@@ -11,7 +11,7 @@ from typing import Optional
 import boto3
 from dagster import DailyPartitionsDefinition, asset, build_op_context
 from dotenv import load_dotenv
-from vbase_api import VBaseAPIClient
+from vbase_api import VBaseAPIClient, VBaseAPIError
 
 from .portfolio_producer import MARKET_TIME_ZONE, produce_portfolio
 
@@ -34,9 +34,9 @@ def _get_required_setting(name: str) -> str:
     return value.strip()
 
 
-def _get_or_create_collection(client):
-    """Return this sample's collection, creating it when necessary."""
-    collection = next(
+def _find_collection(client):
+    """Return this sample's collection when it already exists."""
+    return next(
         (
             item
             for item in client.get_collections()
@@ -44,13 +44,25 @@ def _get_or_create_collection(client):
         ),
         None,
     )
+
+
+def _get_or_create_collection(client):
+    """Return this sample's collection, creating it when necessary."""
+    collection = _find_collection(client)
     if collection is not None:
         return collection
-    return client.create_collection(
-        name=PORTFOLIO_NAME,
-        description=PORTFOLIO_DESCRIPTION,
-        is_pinned=True,
-    )
+    try:
+        return client.create_collection(
+            name=PORTFOLIO_NAME,
+            description=PORTFOLIO_DESCRIPTION,
+            is_pinned=True,
+        )
+    except VBaseAPIError:
+        # Another first materialization may have created it concurrently.
+        collection = _find_collection(client)
+        if collection is not None:
+            return collection
+        raise
 
 
 def _wait_for_stamp(client, created_receipt):

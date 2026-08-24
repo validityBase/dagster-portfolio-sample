@@ -13,6 +13,10 @@ PORTFOLIO_BYTES = b"sym,wt\nSPY,1\n"
 PORTFOLIO_CID = "0xdda8e4685a737a3416f2fd57cd287e0e8b14400459105372ab5135c0210765e1"
 
 
+class FakeVBaseAPIError(Exception):
+    """Represent an API error raised by the public client."""
+
+
 class FakeLog:  # pylint: disable=too-few-public-methods
     """Collect log calls without depending on Dagster internals."""
 
@@ -148,6 +152,7 @@ def _load_portfolio_asset_module(s3_client):
     dotenv_module.load_dotenv = lambda: None
 
     vbase_api_module = ModuleType("vbase_api")
+    vbase_api_module.VBaseAPIError = FakeVBaseAPIError
     vbase_api_module.VBaseAPIClient = FakeVBaseAPIClient
 
     producer_module = ModuleType("dagster_pipelines.assets.portfolio_producer")
@@ -246,6 +251,69 @@ class PortfolioAssetTests(unittest.TestCase):
                 }
             ],
         )
+
+    def test_collection_creation_recovers_from_a_concurrent_create(self):
+        """Reuse the collection created by another first materialization."""
+        portfolio_asset_module = _load_portfolio_asset_module(FakeS3Client())
+        collection = SimpleNamespace(name="TestPortfolio", cid="0xcollection")
+
+        class ConcurrentCollectionClient:
+            """Expose an empty first read and the winning collection afterward."""
+
+            def __init__(self):
+                self.get_calls = 0
+                self.create_calls = []
+
+            def get_collections(self):
+                """Return the winning collection only after the failed create."""
+                self.get_calls += 1
+                return [] if self.get_calls == 1 else [collection]
+
+            def create_collection(self, **kwargs):
+                """Represent losing the concurrent create race."""
+                self.create_calls.append(kwargs)
+                raise FakeVBaseAPIError("Collection already exists")
+
+        client = ConcurrentCollectionClient()
+
+        # pylint: disable=protected-access
+        result = portfolio_asset_module._get_or_create_collection(client)
+
+        self.assertIs(result, collection)
+        self.assertEqual(client.get_calls, 2)
+        self.assertEqual(
+            client.create_calls,
+            [
+                {
+                    "name": "TestPortfolio",
+                    "description": "Daily portfolio records produced by Dagster.",
+                    "is_pinned": True,
+                }
+            ],
+        )
+
+    def test_collection_creation_preserves_unresolved_api_errors(self):
+        """Do not hide an API failure when no concurrent collection exists."""
+        portfolio_asset_module = _load_portfolio_asset_module(FakeS3Client())
+        api_error = FakeVBaseAPIError("Service unavailable")
+
+        class FailedCollectionClient:
+            """Return no collection before or after a failed create."""
+
+            def get_collections(self):
+                """Return no concurrently created collection."""
+                return []
+
+            def create_collection(self, **kwargs):
+                """Raise the original unrelated API failure."""
+                del kwargs
+                raise api_error
+
+        with self.assertRaises(FakeVBaseAPIError) as raised:
+            # pylint: disable=protected-access
+            portfolio_asset_module._get_or_create_collection(FailedCollectionClient())
+
+        self.assertIs(raised.exception, api_error)
 
     def test_debug_default_uses_the_new_york_market_date(self):
         """Select the New York date when the host's calendar is already ahead."""
