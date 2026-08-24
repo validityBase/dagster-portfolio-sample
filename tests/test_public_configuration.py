@@ -1,8 +1,8 @@
 """Checks for the public dependency and configuration contract."""
 
+import tomllib
 import unittest
 from pathlib import Path
-import tomllib
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 

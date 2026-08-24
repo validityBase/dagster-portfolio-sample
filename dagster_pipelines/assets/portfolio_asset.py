@@ -13,7 +13,7 @@ from dagster import DailyPartitionsDefinition, asset, build_op_context
 from dotenv import load_dotenv
 from vbase_api import VBaseAPIClient
 
-from .portfolio_producer import produce_portfolio
+from .portfolio_producer import MARKET_TIME_ZONE, produce_portfolio
 
 # The vBase collection that receives stamps for individual portfolios.
 PORTFOLIO_NAME = "TestPortfolio"
@@ -171,13 +171,14 @@ def portfolio_asset(context):
 
 def debug_portfolio(date_str: Optional[str] = None) -> None:
     """
-    Materialize the portfolio asset for a specific date or today's date.
+    Materialize the portfolio asset for a specific date or today's market date.
 
     Args:
-        date_str: Optional date string in YYYY-MM-DD format. If None, uses today's date.
+        date_str: Optional date string in YYYY-MM-DD format. If None, uses today's
+            date in the New York market timezone.
     """
-    # Use provided date or today's date.
-    partition_date = date_str or datetime.now().strftime("%Y-%m-%d")
+    # Use the provided date or today's date in the market timezone.
+    partition_date = date_str or datetime.now(MARKET_TIME_ZONE).strftime("%Y-%m-%d")
 
     # Create a context for debugging.
     context = build_op_context(partition_key=partition_date)

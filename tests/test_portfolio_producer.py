@@ -1,8 +1,8 @@
 """Behavior tests for portfolio production timing."""
 
+import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace
-import unittest
 from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 

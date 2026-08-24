@@ -4,8 +4,10 @@ import importlib
 import os
 import sys
 import unittest
+from datetime import datetime
 from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 PORTFOLIO_BYTES = b"sym,wt\nSPY,1\n"
 PORTFOLIO_CID = "0xdda8e4685a737a3416f2fd57cd287e0e8b14400459105372ab5135c0210765e1"
@@ -112,9 +114,7 @@ class FakeVBaseAPIClient:
     def verify_stamps(self, cids, filter_by_user=False):
         """Capture verification and return stale and exact receipts."""
         self.verify_calls.append((cids, filter_by_user))
-        return SimpleNamespace(
-            stamp_list=[self.stale_receipt, self.created_receipt]
-        )
+        return SimpleNamespace(stamp_list=[self.stale_receipt, self.created_receipt])
 
 
 def _identity_asset(*args, **kwargs):
@@ -151,6 +151,7 @@ def _load_portfolio_asset_module(s3_client):
     vbase_api_module.VBaseAPIClient = FakeVBaseAPIClient
 
     producer_module = ModuleType("dagster_pipelines.assets.portfolio_producer")
+    producer_module.MARKET_TIME_ZONE = ZoneInfo("America/New_York")
     producer_module.produce_portfolio = lambda partition_date, logger: (
         FakePortfolioFrame()
     )
@@ -245,6 +246,27 @@ class PortfolioAssetTests(unittest.TestCase):
                 }
             ],
         )
+
+    def test_debug_default_uses_the_new_york_market_date(self):
+        """Select the New York date when the host's calendar is already ahead."""
+        portfolio_asset_module = _load_portfolio_asset_module(FakeS3Client())
+
+        class FixedDatetime(datetime):
+            """Represent 00:30 UTC while New York is still on the prior date."""
+
+            @classmethod
+            def now(cls, tz=None):
+                if tz is None:
+                    return cls(2026, 8, 25, 0, 30)
+                return cls(2026, 8, 24, 20, 30, tzinfo=tz)
+
+        with (
+            patch.object(portfolio_asset_module, "datetime", FixedDatetime),
+            patch.object(portfolio_asset_module, "portfolio_asset") as materialize,
+        ):
+            portfolio_asset_module.debug_portfolio()
+
+        materialize.assert_called_once_with({"partition_key": "2026-08-24"})
 
 
 if __name__ == "__main__":
