@@ -77,7 +77,6 @@ def _wait_for_stamp(client, created_receipt):
             if (
                 receipt.object_cid.lower() == created_receipt.object_cid.lower()
                 and receipt.set_cid.lower() == created_receipt.set_cid.lower()
-                and receipt.user_address.lower() == created_receipt.user_address.lower()
                 and receipt.transaction_hash.lower()
                 == created_receipt.transaction_hash.lower()
             ):

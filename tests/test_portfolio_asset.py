@@ -252,6 +252,35 @@ class PortfolioAssetTests(unittest.TestCase):
 
         self.assertEqual(FakeVBaseAPIClient.instances, [])
 
+    def test_verification_accepts_account_name_for_created_address(self):
+        """Match one transaction when verification returns an account name."""
+        portfolio_asset_module = _load_portfolio_asset_module(FakeS3Client())
+        client = FakeVBaseAPIClient("test-api-key")
+        verified_receipt = SimpleNamespace(
+            object_cid=client.created_receipt.object_cid,
+            set_cid=client.created_receipt.set_cid,
+            user_address="account-name",
+            transaction_hash=client.created_receipt.transaction_hash,
+            timestamp=client.created_receipt.timestamp,
+        )
+
+        with (
+            patch.object(
+                client,
+                "verify_stamps",
+                return_value=SimpleNamespace(stamp_list=[verified_receipt]),
+            ),
+            patch.object(portfolio_asset_module, "STAMP_TIMEOUT_SECONDS", 0.01),
+            patch.object(portfolio_asset_module, "STAMP_POLL_INTERVAL_SECONDS", 0),
+        ):
+            # pylint: disable=protected-access
+            receipt = portfolio_asset_module._wait_for_stamp(
+                client,
+                client.created_receipt,
+            )
+
+        self.assertIs(receipt, verified_receipt)
+
     def test_first_materialization_creates_the_sample_collection(self):
         """Create and pin the collection when the account has none."""
         FakeVBaseAPIClient.return_existing_collection = False
