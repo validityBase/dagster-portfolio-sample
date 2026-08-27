@@ -2,116 +2,188 @@
 This asset is used to generate a position for the SPY ETF.
 """
 
+import hashlib
 import os
-import pprint
-from datetime import datetime
+import time
+from datetime import datetime, timezone
+from typing import Optional
 
 import boto3
 from dagster import DailyPartitionsDefinition, asset, build_op_context
 from dotenv import load_dotenv
-from vbase import (
-    ForwarderCommitmentService,
-    VBaseClient,
-    VBaseDataset,
-    VBaseStringObject,
-)
+from vbase_api import VBaseAPIClient, VBaseAPIError
 
-from .portfolio_producer import produce_portfolio
+from .portfolio_producer import MARKET_TIME_ZONE, produce_portfolio
 
-# The name of the portfolio set (collection).
-# This is the vBase set (collection) that receive the object commitments (stamps)
-# for the individual portfolios.
+# The vBase collection that receives stamps for individual portfolios.
 PORTFOLIO_NAME = "TestPortfolio"
+PORTFOLIO_DESCRIPTION = "Daily portfolio records produced by Dagster."
+STAMP_TIMEOUT_SECONDS = 120
+STAMP_POLL_INTERVAL_SECONDS = 5
 
 # Define a daily partition for portfolio rebalancing.
 # The portfolio rebalances daily starting from 2025-01-01.
 partitions_def = DailyPartitionsDefinition(start_date="2025-01-01")
 
-# The vBase forwarder URL for making commitments via the vBase forwarder.
-VBASE_FORWARDER_URL = "https://dev.api.vbase.com/forwarder-test/"
+
+def _get_required_setting(name: str) -> str:
+    """Return a non-empty environment setting or raise a helpful error."""
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        raise ValueError(f"{name} environment variable is not set.")
+    return value.strip()
+
+
+def _find_collection(client):
+    """Return this sample's collection when it already exists."""
+    return next(
+        (
+            item
+            for item in client.get_collections()
+            if item.name.casefold() == PORTFOLIO_NAME.casefold()
+        ),
+        None,
+    )
+
+
+def _get_or_create_collection(client):
+    """Return this sample's collection, creating it when necessary."""
+    collection = _find_collection(client)
+    if collection is not None:
+        return collection
+    try:
+        return client.create_collection(
+            name=PORTFOLIO_NAME,
+            description=PORTFOLIO_DESCRIPTION,
+            is_pinned=True,
+        )
+    except VBaseAPIError:
+        # Another first materialization may have created it concurrently.
+        collection = _find_collection(client)
+        if collection is not None:
+            return collection
+        raise
+
+
+def _wait_for_stamp(client, created_receipt):
+    """Wait for verification of the exact transaction just created."""
+    deadline = time.monotonic() + STAMP_TIMEOUT_SECONDS
+    while time.monotonic() < deadline:
+        verification = client.verify_stamps(
+            [created_receipt.object_cid],
+            filter_by_user=True,
+        )
+        for receipt in verification.stamp_list:
+            if (
+                receipt.object_cid.lower() == created_receipt.object_cid.lower()
+                and receipt.set_cid.lower() == created_receipt.set_cid.lower()
+                and receipt.transaction_hash.lower()
+                == created_receipt.transaction_hash.lower()
+            ):
+                return receipt
+        time.sleep(STAMP_POLL_INTERVAL_SECONDS)
+    raise TimeoutError(
+        "Timed out waiting for vBase transaction "
+        f"{created_receipt.transaction_hash}."
+    )
+
+
+def _stamp_portfolio(api_key: str, object_cid: str):
+    """Stamp one portfolio CID and return its collection and verified receipt."""
+    with VBaseAPIClient(api_key=api_key) as client:
+        collection = _get_or_create_collection(client)
+        stamp = client.create_stamp(
+            data_cid=object_cid,
+            collection_cid=collection.cid,
+            store_stamped_file=False,
+            idempotent=False,
+        )
+        created_receipt = stamp.commitment_receipt
+        if created_receipt.object_cid.lower() != object_cid.lower():
+            raise RuntimeError("vBase returned a different CID than the portfolio.")
+        return collection, _wait_for_stamp(client, created_receipt)
+
+
+def _get_portfolio_filename(
+    partition_date: str,
+    object_cid: str,
+) -> str:
+    """Build a stable, collision-resistant filename for one daily partition."""
+    partition_datetime = datetime.strptime(partition_date, "%Y-%m-%d").replace(
+        tzinfo=timezone.utc
+    )
+    # vBase portfolio tooling parses this canonical daily timestamp at the basename end.
+    return (
+        f"portfolio--partition-{partition_date}"
+        f"--cid-{object_cid.lower()}"
+        f"_{partition_datetime.strftime('%Y-%m-%d_%H-%M-%S%z')}.csv"
+    )
 
 
 @asset(partitions_def=partitions_def)
 def portfolio_asset(context):
     """
-    This asset is used to generate a position for the SPY ETF.
+    Generate, stamp, and store one SPY portfolio partition.
     """
 
-    # Load the environment variables and check that settings are defined.
     load_dotenv()
-    # Check that all the required settings are defined:
-    required_settings = [
-        "VBASE_API_KEY",
-        "VBASE_COMMITMENT_SERVICE_PRIVATE_KEY",
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SECRET_ACCESS_KEY",
-        "S3_BUCKET",
-        "S3_FOLDER",
-    ]
-    for setting in required_settings:
-        if setting not in os.environ:
-            raise ValueError(f"{setting} environment variable is not set.")
+    api_key = _get_required_setting("VBASE_API_KEY")
+    bucket = _get_required_setting("S3_BUCKET")
+    folder = _get_required_setting("S3_FOLDER").strip("/")
 
-    # Get the current partition date.
     partition_date = context.asset_partition_key_for_output()
     context.log.info("Starting portfolio generation for %s", partition_date)
 
-    try:
-        # Produce the portfolio for the partition date.
-        df_portfolio = produce_portfolio(partition_date, logger=context.log)
-        context.log.info(f"{partition_date}: position_df = \n{df_portfolio}")
+    portfolio_frame = produce_portfolio(partition_date, logger=context.log)
+    context.log.info("%s: position_df = \n%s", partition_date, portfolio_frame)
+    portfolio_bytes = portfolio_frame.to_csv(
+        index=False,
+        lineterminator="\n",
+    ).encode("utf-8")
+    object_cid = "0x" + hashlib.sha3_256(portfolio_bytes).hexdigest()
 
-        # pylint: disable=fixme
-        # TODO: Saving should be idempotent within some time window.
-        # TODO: Do not save if the portfolio is the same as the previous portfolio within a window.
-        # Save the position to a CSV file in an S3 bucket.
-        # Use the boto3 library to save the file to the bucket
-        # and folder specified in the environment variables.
-        # Create the filename using a format: portfolio--2024-12-11_07-58-46.csv
-        # recognized by vBase validation tools and the current timestamp.
-        bucket = os.environ["S3_BUCKET"]
-        folder = os.environ["S3_FOLDER"]
-        filename = f"portfolio--{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
-        s3_client = boto3.client("s3")
-        context.log.info(f"Saving portfolio to s3://{bucket}/{folder}/{filename}")
-        body = df_portfolio.to_csv(index=False)
-        context.log.info(f"{partition_date}: body = \n{body}")
-        s3_client.put_object(
-            Bucket=bucket,
-            Key=f"{folder}/{filename}",
-            Body=body,
-        )
+    # A repeated partition and CID can overwrite only the same exact object bytes.
+    filename = _get_portfolio_filename(
+        partition_date,
+        object_cid,
+    )
+    object_key = f"{folder}/{filename}"
+    s3_client = boto3.client("s3")
+    context.log.info("Saving portfolio to s3://%s/%s", bucket, object_key)
+    s3_client.put_object(
+        Bucket=bucket,
+        Key=object_key,
+        Body=portfolio_bytes,
+    )
 
-        # Make a vBase stamp of the portfolio.
-        vbc = VBaseClient(
-            ForwarderCommitmentService(
-                forwarder_url=VBASE_FORWARDER_URL,
-                api_key=os.environ["VBASE_API_KEY"],
-                private_key=os.environ["VBASE_COMMITMENT_SERVICE_PRIVATE_KEY"],
-            )
-        )
-        # Create the dataset object, if necessary.
-        # This operation is idempotent.
-        ds = VBaseDataset(vbc, PORTFOLIO_NAME, VBaseStringObject)
-        # Add a record to the dataset.
-        # TODO: Stamping should be idempotent within some time window.
-        # TODO: Do not stamp if the portfolio is the same as the previous portfolio within a window.
-        receipt = ds.add_record("body")
-        context.log.info(f"ds.add_record() receipt:\n{pprint.pformat(receipt)}")
+    collection, verified_receipt = _stamp_portfolio(api_key, object_cid)
 
-    except ValueError as e:
-        context.log.error(str(e))
+    context.add_output_metadata(
+        {
+            "S3 URI": f"s3://{bucket}/{object_key}",
+            "vBase collection CID": collection.cid,
+            "vBase object CID": verified_receipt.object_cid,
+            "vBase transaction": verified_receipt.transaction_hash,
+            "vBase timestamp": verified_receipt.timestamp,
+        }
+    )
+    context.log.info(
+        "Verified vBase transaction %s for %s",
+        verified_receipt.transaction_hash,
+        verified_receipt.object_cid,
+    )
 
 
-def debug_portfolio(date_str: str = None) -> None:
+def debug_portfolio(date_str: Optional[str] = None) -> None:
     """
-    Materialize the portfolio asset for a specific date or today's date.
+    Materialize the portfolio asset for a specific date or today's market date.
 
     Args:
-        date_str: Optional date string in YYYY-MM-DD format. If None, uses today's date.
+        date_str: Optional date string in YYYY-MM-DD format. If None, uses today's
+            date in the New York market timezone.
     """
-    # Use provided date or today's date.
-    partition_date = date_str or datetime.now().strftime("%Y-%m-%d")
+    # Use the provided date or today's date in the market timezone.
+    partition_date = date_str or datetime.now(MARKET_TIME_ZONE).strftime("%Y-%m-%d")
 
     # Create a context for debugging.
     context = build_op_context(partition_key=partition_date)
@@ -121,8 +193,4 @@ def debug_portfolio(date_str: str = None) -> None:
 
 
 if __name__ == "__main__":
-    # Run for today's date.
     debug_portfolio()
-
-    # Run for a specific past date.
-    debug_portfolio("2025-04-04")

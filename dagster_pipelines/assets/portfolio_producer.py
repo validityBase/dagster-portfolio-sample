@@ -3,10 +3,18 @@ This module contains the logic for producing portfolio positions.
 """
 
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pandas_market_calendars as mcal
 import yfinance as yf
+
+MARKET_TIME_ZONE = ZoneInfo("America/New_York")
+
+
+def _format_market_time(timestamp) -> str:
+    """Format a timezone-aware timestamp in the NYSE timezone."""
+    return timestamp.tz_convert(MARKET_TIME_ZONE).strftime("%H:%M %Z")
 
 
 def produce_portfolio(portfolio_date: str, logger: object) -> pd.DataFrame:
@@ -38,22 +46,21 @@ def produce_portfolio(portfolio_date: str, logger: object) -> pd.DataFrame:
     target_time = schedule.iloc[0]["market_close"] - timedelta(minutes=10)
     logger.info(
         f"Market close time for {portfolio_date}: "
-        f"{schedule.iloc[0]['market_close'].strftime('%H:%M')}"
+        f"{_format_market_time(schedule.iloc[0]['market_close'])}"
     )
-    logger.info(f"Target time for price: {target_time.strftime('%H:%M')}")
+    logger.info(f"Target time for price: {_format_market_time(target_time)}")
 
     # Check if we're dealing with current date and if we're past the target time.
     portfolio_datetime = datetime.strptime(portfolio_date, "%Y-%m-%d")
-    current_datetime = datetime.now()
+    current_datetime = datetime.now(MARKET_TIME_ZONE)
     is_current_date = portfolio_datetime.date() == current_datetime.date()
-    logger.info(f"Current time: {current_datetime.strftime('%Y-%m-%d %H:%M')}")
+    logger.info(f"Current time: {current_datetime.strftime('%Y-%m-%d %H:%M %Z')}")
     logger.info(f"Is current date: {is_current_date}")
 
-    if is_current_date and current_datetime < datetime.combine(
-        portfolio_datetime.date(), target_time.time()
-    ):
+    if is_current_date and current_datetime < target_time:
         error_message = (
-            f"Current time is before target time ({target_time.strftime('%H:%M')})."
+            "Current time is before target time "
+            f"({_format_market_time(target_time)})."
         )
         logger.error(error_message)
         raise ValueError(error_message)
