@@ -1,4 +1,4 @@
-boto3==1.43.78
+boto3==1.43.79
 dagster==1.10.6
 dagster-cloud==1.10.6
 greenlet==3.5.5
