@@ -18,7 +18,7 @@
 - Delegates to `validityBase/vbase-github-actions/.github/workflows/python-lint.yml@v1`.
 - Installs `requirements/dev.txt` with Python 3.12.
 - Runs `pylint --fail-under=8.0 $(git ls-files '*.py')`.
-- Uses the runner from `vars.RUNS_ON` when set, otherwise `ubuntu-latest`.
+- Uses the runner from `vars.RUNS_ON` when set, otherwise `ubuntu-24.04`.
 
 ### `.github/workflows/python-dependency-locks.yml`
 - Runs on pushes to all branch names, pull requests, and manual dispatch.
