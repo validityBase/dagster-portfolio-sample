@@ -13,7 +13,7 @@ jobs:
   lint:
     uses: validityBase/vbase-github-actions/.github/workflows/python-lint.yml@v1
     with:
-      runner: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+      runner: ${{ vars.RUNS_ON || 'ubuntu-24.04' }}
       python-version: "3.12"
       requirements-files: |
         requirements/dev.txt
