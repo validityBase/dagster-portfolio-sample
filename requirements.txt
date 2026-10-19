@@ -1,5 +1,6 @@
 boto3
 dagster
+dagster-cloud
 dagster-webserver
 pandas
 pandas_market_calendars

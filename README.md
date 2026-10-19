@@ -45,8 +45,9 @@ static AWS keys are not required by the application.
    S3_FOLDER=your_portfolio_prefix
    ```
 
-   `.env` is ignored by Git. Configure AWS credentials through your normal
-   boto3 credential source.
+   `.env` is ignored by Git. For Dagster Cloud, configure the same values as
+   deployment environment variables or secrets. Configure AWS credentials
+   through your normal boto3 credential source.
 
 4. Start Dagster:
 
