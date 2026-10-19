@@ -27,10 +27,10 @@ static AWS keys are not required by the application.
 
    On Windows, run these Linux commands inside WSL 2.
 
-2. Install the reproducible dependencies for local development:
+2. Install the sample dependencies:
 
    ```bash
-   python -m pip install --require-hashes -r requirements-dev.txt
+   python -m pip install -r requirements.txt
    ```
 
 3. Copy the example configuration and replace its placeholders:
@@ -45,9 +45,8 @@ static AWS keys are not required by the application.
    S3_FOLDER=your_portfolio_prefix
    ```
 
-   `.env` is ignored by Git. For Dagster Cloud, configure the same values as
-   deployment environment variables or secrets. Configure AWS credentials
-   through your normal boto3 credential source.
+   `.env` is ignored by Git. Configure AWS credentials through your normal
+   boto3 credential source.
 
 4. Start Dagster:
 
@@ -96,24 +95,18 @@ before requesting its new stamp.
 
 ## Development
 
-Install the development lock and run the local checks:
+Install the sample dependencies and run the tests:
 
 ```bash
-python -m pip install --require-hashes -r requirements-dev.txt
+python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
-pre-commit run --all-files
-pylint --fail-under=8.0 $(git ls-files '*.py')
 ```
-
-See [Python dependency hashes](internal/specs/python-dependency-hashes.md) for
-the lock-file regeneration process.
 
 Additional references:
 
 - [vBase Python samples](https://github.com/validityBase/vbase-py-samples/tree/main/samples)
 - [CSV portfolio producer](https://github.com/validityBase/vbase-py-samples/blob/main/samples/produce_portfolio_history_csv_s3.py)
 - [CSV portfolio verifier](https://github.com/validityBase/vbase-py-samples/blob/main/samples/verify_portfolio_history_csv_s3.py)
-- [Dagster 1.10 webserver and UI](https://release-1-10-21.archive.dagster-docs.io/guides/operate/webserver)
 
 ## License
 

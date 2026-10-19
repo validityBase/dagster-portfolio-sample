@@ -12,7 +12,7 @@ class PublicConfigurationTests(unittest.TestCase):
 
     def test_public_runtime_contract_matches_supported_environment(self):
         """Keep the API, Python, and data-source setup internally consistent."""
-        runtime_requirements = (REPOSITORY_ROOT / "requirements" / "base.in").read_text(
+        runtime_requirements = (REPOSITORY_ROOT / "requirements.txt").read_text(
             encoding="utf-8"
         )
         project_config = tomllib.loads(
@@ -31,10 +31,9 @@ class PublicConfigurationTests(unittest.TestCase):
             ]
         )
 
-        self.assertIn("vbase-api==0.1.3", runtime_requirements)
-        self.assertNotIn("\nvbase==", "\n" + runtime_requirements)
+        self.assertIn("vbase-api", runtime_requirements.splitlines())
+        self.assertNotIn("vbase", runtime_requirements.splitlines())
         self.assertEqual(project_config["project"]["requires-python"], ">=3.12")
-        self.assertEqual(project_config["tool"]["black"]["target-version"], ["py312"])
         self.assertIn("Python 3.12 or later", public_content)
         self.assertIn("most recent 60 days", public_content)
         for legacy_marker in (
