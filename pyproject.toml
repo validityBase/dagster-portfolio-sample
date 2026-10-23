@@ -9,12 +9,5 @@ authors = [
     { name = "ValidityBase", email = "info@validitybase.com" }
 ]
 
-[tool.isort]
-# Avoid conflicts with black formatter.
-profile = "black"
-
-[tool.black]
-target-version = ["py312"]
-
 [tool.dagster]
 module_name = "dagster_pipelines.definitions"
