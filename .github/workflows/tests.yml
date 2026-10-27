@@ -16,13 +16,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # actions/checkout v5.0.1
 
-      - name: Install development dependencies
+      - name: Install sample dependencies
         uses: validityBase/vbase-github-actions/.github/actions/setup-python-deps@v1
         with:
           requirements-files: |
-            requirements/dev.txt
+            requirements.txt
           python-version: "3.12"
-          require-hashes: true
 
       - name: Run tests
         run: python -m unittest discover -s tests -v
