@@ -96,6 +96,9 @@ before requesting its new stamp.
 
 ## Development
 
+The GitHub Actions test workflow runs when a pull request is opened, updated,
+or reopened.
+
 Install the sample dependencies and run the tests:
 
 ```bash
